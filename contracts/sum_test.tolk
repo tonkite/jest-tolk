@@ -20,14 +20,6 @@ get test_fails_if_value_is_not_int() {
 }
 
 // @scope sum()
-get test_fails_if_value_is_not_int_vm_logs() {
-    val a: int = null;
-    val b: int = 7;
-
-    calculateSum(a, b);
-}
-
-// @scope sum()
 // @gasLimit 50
 // @exitCode -14 (out of gas)
 get test_fails_because_of_out_of_gas() {

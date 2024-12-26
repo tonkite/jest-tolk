@@ -1,3 +1,19 @@
+/**
+ * Copyright 2024 Scaleton Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 import {
   AssertionResult,
   createEmptyTestResult,
@@ -52,6 +68,7 @@ const runTest: RunTest = async ({
     entrypointFileName,
     fsReadCallback: (path: string) => {
       const content = fs.readFileSync(path).toString();
+      // NOTE: It's required to have either onInternalMessage() or main() method.
       return path == entrypointFileName
         ? content + '\n\n' + 'fun onInternalMessage() {}'
         : content;
@@ -74,6 +91,8 @@ const runTest: RunTest = async ({
 
   let numFailingTests = 0;
   let numPassingTests = 0;
+  let numPendingTests = 0;
+
   const testResults: AssertionResult[] = [];
   const testCases = await extractGetMethods(testSourceCode.contents);
 
@@ -88,19 +107,39 @@ const runTest: RunTest = async ({
   const DEFAULT_GAS_LIMIT = 10_000;
   const DEFAULT_UNIX_TIME = Math.floor(Date.now() / 1000);
 
-  for (const testCase of testCases) {
-    const testCaseName = testCase.methodName
-      .replace(/^test_/, '')
-      .replace(/_/g, ' ');
+  const testNamePattern =
+    globalConfig.testNamePattern &&
+    new RegExp(globalConfig.testNamePattern, 'i');
 
+  for (const testCase of testCases) {
     let annotations: TestAnnotations = {};
     let start: number = 0;
     let end: number = 0;
+
+    const testCaseName = testCase.methodName
+      .replace(/^test_/, '')
+      .replace(/_/g, ' ');
 
     try {
       annotations = testCase.docBlock
         ? extractAnnotationsFromDocBlock(testCase.docBlock)
         : {};
+
+      if (testNamePattern && !testNamePattern.test(testCase.methodName)) {
+        testResults.push({
+          duration: end - start,
+          failureDetails: [],
+          failureMessages: [],
+          numPassingAsserts: 0,
+          status: 'pending',
+          ancestorTitles: annotations.scope ? [annotations.scope] : [],
+          title: testCaseName,
+          fullName: testCaseName,
+        });
+
+        numPendingTests += 1;
+        continue;
+      }
 
       start = Date.now();
       const { output } = await executor.runGetMethod({
@@ -134,7 +173,7 @@ const runTest: RunTest = async ({
         if (output.vm_exit_code !== 0) {
           const stackTrace = extractStackTrace(output.vm_log);
           throw new Error(
-            `Test case has thrown an error code ${output.vm_exit_code}.\n\n[...]\n${stackTrace}`,
+            `Test case has failed with an error code ${output.vm_exit_code}.\n\n[...]\n${stackTrace}`,
           );
         }
       }
@@ -184,7 +223,7 @@ const runTest: RunTest = async ({
     ),
     numFailingTests,
     numPassingTests,
-    numPendingTests: 0,
+    numPendingTests,
     numTodoTests: 0,
     testResults,
     testFilePath: testPath,
