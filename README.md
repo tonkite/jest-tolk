@@ -51,6 +51,10 @@ get test_fails_if_value_is_not_int() {
 }
 ```
 
+Test result:
+
+<img alt="Result" src="./images/test-result.png" width="343" height="auto">
+
 ## Installation
 
 1. Install `@tonkite/jest-tolk`:
