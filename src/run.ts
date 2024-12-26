@@ -112,10 +112,6 @@ const runTest: RunTest = async ({
     new RegExp(globalConfig.testNamePattern, 'i');
 
   for (const testCase of testCases) {
-    if (!testCase.methodName.startsWith('test')) {
-      continue;
-    }
-
     let annotations: TestAnnotations = {};
     let start: number = 0;
     let end: number = 0;
@@ -129,7 +125,16 @@ const runTest: RunTest = async ({
         ? extractAnnotationsFromDocBlock(testCase.docBlock)
         : {};
 
-      if (testNamePattern && !testNamePattern.test(testCase.methodName)) {
+      const isTest =
+        testCase.methodName.startsWith('test_') || annotations.test;
+      if (!isTest) {
+        continue;
+      }
+
+      const skip =
+        annotations.skip ||
+        (testNamePattern && !testNamePattern.test(testCase.methodName));
+      if (skip) {
         testResults.push({
           duration: end - start,
           failureDetails: [],

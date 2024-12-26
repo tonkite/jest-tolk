@@ -20,6 +20,8 @@ export interface TestAnnotations {
   balance?: bigint;
   gasLimit?: number;
   unixTime?: number;
+  test?: boolean;
+  skip?: boolean;
 }
 
 export function extractAnnotationsFromDocBlock(
@@ -49,6 +51,14 @@ export function extractAnnotationsFromDocBlock(
 
     if ((matches = line.match(/@unixTime\s+(\d+)/))) {
       annotations.unixTime = parseInt(matches[1]);
+    }
+
+    if ((matches = line.match(/@skip/))) {
+      annotations.skip = true;
+    }
+
+    if ((matches = line.match(/@test/))) {
+      annotations.test = true;
     }
   }
 
