@@ -112,6 +112,10 @@ const runTest: RunTest = async ({
     new RegExp(globalConfig.testNamePattern, 'i');
 
   for (const testCase of testCases) {
+    if (!testCase.methodName.startsWith('test')) {
+      continue;
+    }
+
     let annotations: TestAnnotations = {};
     let start: number = 0;
     let end: number = 0;
