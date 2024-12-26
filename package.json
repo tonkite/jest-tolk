@@ -1,12 +1,16 @@
 {
   "name": "@tonkite/jest-tolk",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "main": "dist/index.js",
   "types": "dist/index.js",
   "license": "Apache-2.0",
   "files": [
     "dist"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tonkite/jest-tolk.git"
+  },
   "scripts": {
     "build": "tsc",
     "pretest": "tsc",
@@ -37,5 +41,10 @@
     "create-jest-runner": "^0.12.3",
     "jest-message-util": "^29.7.0"
   },
-  "packageManager": "pnpm@8.15.6+sha1.8105075ad0aa306138be128c017e9c41e28ecffa"
+  "packageManager": "pnpm@8.15.6+sha1.8105075ad0aa306138be128c017e9c41e28ecffa",
+  "keywords": [
+    "tolk",
+    "jest",
+    "ton"
+  ]
 }
