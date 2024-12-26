@@ -92,6 +92,7 @@ const runTest: RunTest = async ({
   let numFailingTests = 0;
   let numPassingTests = 0;
   let numPendingTests = 0;
+  let numTodoTests = 0;
 
   const testResults: AssertionResult[] = [];
   const testCases = await extractGetMethods(testSourceCode.contents);
@@ -147,6 +148,22 @@ const runTest: RunTest = async ({
         });
 
         numPendingTests += 1;
+        continue;
+      }
+
+      if (annotations.todo) {
+        testResults.push({
+          duration: end - start,
+          failureDetails: [],
+          failureMessages: [],
+          numPassingAsserts: 0,
+          status: 'todo',
+          ancestorTitles: annotations.scope ? [annotations.scope] : [],
+          title: testCaseName,
+          fullName: testCaseName,
+        });
+
+        numTodoTests += 1;
         continue;
       }
 
@@ -233,7 +250,7 @@ const runTest: RunTest = async ({
     numFailingTests,
     numPassingTests,
     numPendingTests,
-    numTodoTests: 0,
+    numTodoTests,
     testResults,
     testFilePath: testPath,
   };

@@ -28,3 +28,7 @@ get test_fails_because_of_out_of_gas() {
 
     calculateSum(a, b);
 }
+
+// @scope sum()
+// @todo
+get test_marked_as_todo() {}

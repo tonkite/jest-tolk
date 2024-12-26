@@ -110,6 +110,7 @@ Here is description of supported annotations:
 | `@exitCode [exitCode]`  | `// @exitCode 500`        | Specifies expected exit code. _Default: `0`._                   |
 | `@scope [scope]`        | `// @scope Pool::onSwap`  | Specifies a scope of a test (useful for test grouping).         |
 | `@skip`                 | `// @skip`                | Marks a test to be skipped.                                     |
+| `@todo`                 | `// @todo`                | Marks a test to be done later.                                  |
 | `@test`                 | `// @test`                | Marks a get-method (which isn't started by "test\_") as a test. |
 | `@balance [balance]`    | `// @balance 1000000000`  | Sets a balance for a test. _Default: `1000000000` (1 TON)._     |
 | `@gasLimit [gas limit]` | `// @gasLimit 50000`      | Sets a gas limit for a test. _Default: `10000`._                |

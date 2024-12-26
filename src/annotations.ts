@@ -22,6 +22,7 @@ export interface TestAnnotations {
   unixTime?: number;
   test?: boolean;
   skip?: boolean;
+  todo?: boolean;
 }
 
 export function extractAnnotationsFromDocBlock(
@@ -59,6 +60,10 @@ export function extractAnnotationsFromDocBlock(
 
     if ((matches = line.match(/@test/))) {
       annotations.test = true;
+    }
+
+    if ((matches = line.match(/@todo/))) {
+      annotations.todo = true;
     }
   }
 

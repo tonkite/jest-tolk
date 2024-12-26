@@ -32,4 +32,22 @@ describe('extractAnnotationsFromDocBlock()', () => {
       unixTime: 1735231203,
     });
   });
+
+  it('extracts @test', () => {
+    expect(extractAnnotationsFromDocBlock('// @test')).toEqual({
+      test: true,
+    });
+  });
+
+  it('extracts @skip', () => {
+    expect(extractAnnotationsFromDocBlock('// @skip')).toEqual({
+      skip: true,
+    });
+  });
+
+  it('extracts @todo', () => {
+    expect(extractAnnotationsFromDocBlock('// @todo')).toEqual({
+      todo: true,
+    });
+  });
 });
