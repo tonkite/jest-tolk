@@ -68,10 +68,16 @@ const runTest: RunTest = async ({
     entrypointFileName,
     fsReadCallback: (path: string) => {
       const content = fs.readFileSync(path).toString();
+
       // NOTE: It's required to have either onInternalMessage() or main() method.
-      return path == entrypointFileName
-        ? content + '\n\n' + 'fun onInternalMessage() {}'
-        : content;
+      if (path == entrypointFileName) {
+        const disableMain = !!content.match(/(^|\n)\s*\/\/\s+@no-main/);
+        if (!disableMain) {
+          return content + '\n\n' + 'fun main() {}';
+        }
+      }
+
+      return content;
     },
     withStackComments: true,
   });
@@ -83,6 +89,7 @@ const runTest: RunTest = async ({
   const testSourceCode = result.sourcesSnapshot.find(
     ({ filename }) => filename === entrypointFileName,
   );
+
   if (!testSourceCode) {
     throw new Error(
       `Expected behaviour: ${entrypointFileName} not found in a snapshot.`,

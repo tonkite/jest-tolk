@@ -105,16 +105,17 @@ get should_fail_with_exit_code_500() {
 
 ### Supported Annotations:
 
-| Annotation              | Example                   | Description                                                     |
-| ----------------------- | ------------------------- | --------------------------------------------------------------- |
-| `@exitCode [exitCode]`  | `// @exitCode 500`        | Specifies the expected exit code. Default: `0`.                 |
-| `@scope [scope]`        | `// @scope Pool::onSwap`  | Specifies the scope of a test (useful for test grouping).       |
-| `@skip`                 | `// @skip`                | Marks a test to be skipped.                                     |
-| `@todo`                 | `// @todo`                | Marks a test to be done later.                                  |
-| `@test`                 | `// @test`                | Marks a get-method (which isn't prefixed by `test_`) as a test. |
-| `@balance [balance]`    | `// @balance 1000000000`  | Sets a balance for a test. Default: `1000000000` (1 TON).       |
-| `@gasLimit [gas limit]` | `// @gasLimit 50000`      | Sets a gas limit for a test. Default: `10000`.                  |
-| `@unixTime [unix time]` | `// @unixTime 1735231203` | Sets a Unix time for a test. Default: current time.             |
+| Annotation              | Example                   | Description                                                                            |
+|:------------------------|:--------------------------|:---------------------------------------------------------------------------------------|
+| `@exitCode [exitCode]`  | `// @exitCode 500`        | Specifies the expected exit code. Default: `0`.                                        |
+| `@scope [scope]`        | `// @scope Pool::onSwap`  | Specifies the scope of a test (useful for test grouping).                              |
+| `@skip`                 | `// @skip`                | Marks a test to be skipped.                                                            |
+| `@todo`                 | `// @todo`                | Marks a test to be done later.                                                         |
+| `@test`                 | `// @test`                | Marks a get-method (which isn't prefixed by `test_`) as a test.                        |
+| `@balance [balance]`    | `// @balance 1000000000`  | Sets a balance for a test. Default: `1000000000` (1 TON).                              |
+| `@gasLimit [gas limit]` | `// @gasLimit 50000`      | Sets a gas limit for a test. Default: `10000`.                                         |
+| `@unixTime [unix time]` | `// @unixTime 1735231203` | Sets a Unix time for a test. Default: current time.                                    |
+| `@no-main`              | `// @no-main`             | Disables adding an entrypoint `fun main() {}` to avoid collision with an existing one. |
 
 ## License
 
