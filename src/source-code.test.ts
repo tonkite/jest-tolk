@@ -41,4 +41,20 @@ describe('extractGetMethods', () => {
       },
     ]);
   });
+
+  it('extracts get-methods arg-types', () => {
+    expect(
+      extractGetMethods(`
+      get test_case_1(a: int, b: slice) {}
+    `),
+    ).resolves.toEqual([
+      {
+        methodName: 'test_case_1',
+        argTypes: [
+          { type: 'int', name: 'a' },
+          { type: 'slice', name: 'b' },
+        ],
+      },
+    ]);
+  });
 });

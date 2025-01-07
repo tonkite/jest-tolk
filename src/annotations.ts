@@ -23,6 +23,9 @@ export interface TestAnnotations {
   test?: boolean;
   skip?: boolean;
   todo?: boolean;
+  fuzz?: boolean;
+  fuzzTlb?: string;
+  runs?: number;
 }
 
 export function extractAnnotationsFromDocBlock(
@@ -64,6 +67,15 @@ export function extractAnnotationsFromDocBlock(
 
     if ((matches = line.match(/@todo/))) {
       annotations.todo = true;
+    }
+
+    if ((matches = line.match(/@fuzz(?:\s+(.+))?/))) {
+      annotations.fuzz = true;
+      annotations.fuzzTlb = matches[1];
+    }
+
+    if ((matches = line.match(/@runs\s+(\d+)/))) {
+      annotations.runs = parseInt(matches[1]);
     }
   }
 

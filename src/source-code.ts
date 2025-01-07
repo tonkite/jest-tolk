@@ -17,9 +17,15 @@
 import Parser from 'web-tree-sitter';
 import { loadTolk } from '@tonkite/tree-sitter-tolk';
 
+export interface ArgType {
+  type: string;
+  name: string;
+}
+
 export interface GetMethodDeclaration {
   docBlock?: string;
   methodId?: number;
+  argTypes?: ArgType[];
   methodName: string;
 }
 
@@ -40,6 +46,24 @@ export function extractDocBlock(node: Parser.SyntaxNode): string | null {
   const previous = extractDocBlock(node.previousSibling);
 
   return previous ? previous + '\n' + node.text : node.text;
+}
+
+function extractArgTypes(node: Parser.SyntaxNode): ArgType[] | null {
+  const parameters = node.childForFieldName('parameters');
+
+  if (!parameters) {
+    return null;
+  }
+
+  const argTypes = parameters.children
+    .filter((child) => child.type === 'parameter_declaration')
+    .map((child) => {
+      const type = child.childForFieldName('type')?.text ?? '';
+      const name = child.childForFieldName('name')?.text ?? '';
+      return { type, name };
+    });
+
+  return argTypes.length ? argTypes : null;
 }
 
 export async function extractGetMethods(
@@ -73,6 +97,8 @@ export async function extractGetMethods(
       ? extractDocBlock(node.previousSibling)?.replace(/(^|\n)(\/\/\s*)/g, '$1')
       : null;
 
+    const argTypes = extractArgTypes(node);
+
     methods.push({
       methodId: methodId
         ? parseInt(
@@ -82,6 +108,7 @@ export async function extractGetMethods(
         : undefined,
       methodName: methodName!,
       docBlock: docBlock ?? undefined,
+      argTypes: argTypes ?? undefined,
     });
   }
 

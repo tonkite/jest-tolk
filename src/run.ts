@@ -20,16 +20,255 @@ import {
   TestResult,
 } from '@jest/test-result';
 import type { RunTest } from 'create-jest-runner';
-import { runTolkCompiler } from '@ton/tolk-js';
+import { runTolkCompiler, TolkResultSuccess } from '@ton/tolk-js';
 import * as fs from 'node:fs';
-import { defaultConfig, Executor } from '@ton/sandbox';
-import { Address, beginCell, Cell, getMethodId, toNano } from '@ton/core';
-import { randomBytes } from 'node:crypto';
+import { Executor } from '@ton/sandbox';
+import { beginCell, Cell, getMethodId } from '@ton/core';
 import { formatResultsErrors } from 'jest-message-util';
 import chalk from 'chalk';
 import * as assert from 'node:assert';
 import { extractAnnotationsFromDocBlock, TestAnnotations } from './annotations';
-import { extractGetMethods } from './source-code';
+import {
+  ArgType,
+  extractGetMethods,
+  GetMethodDeclaration,
+} from './source-code';
+import { executeFuzzTest } from './fuzz';
+import { runGetMethodWithDefaults } from './utils';
+import { extractFixtures, Fixtures } from './fuzz/fixture';
+
+const runTest: RunTest = async ({
+  testPath,
+  config,
+  globalConfig,
+}): Promise<TestResult> => {
+  const entrypointFileName = testPath.replace(config.rootDir + '/', '');
+  const result = await compileTest(entrypointFileName);
+
+  if (result.status !== 'ok') {
+    throw result.message;
+  }
+
+  const testSourceCode = findTestSourceCode(result, entrypointFileName);
+  const testCases = await extractGetMethods(testSourceCode.contents);
+  const fixtureGetters = filterFixtureGetters(testCases);
+
+  const { executor, code, data } = await setupExecutor(result.codeBoc64);
+  const fixtures = await extractFixtures(executor, code, data, fixtureGetters);
+  const testNamePattern =
+    globalConfig.testNamePattern &&
+    new RegExp(globalConfig.testNamePattern, 'i');
+
+  const {
+    numFailingTests,
+    numPassingTests,
+    numPendingTests,
+    numTodoTests,
+    testResults,
+  } = await executeTestCases(
+    testCases,
+    fixtures,
+    executor,
+    code,
+    data,
+    testNamePattern,
+  );
+
+  return {
+    ...createEmptyTestResult(),
+    failureMessage: formatResultsErrors(
+      testResults,
+      config,
+      globalConfig,
+      testPath,
+    ),
+    numFailingTests,
+    numPassingTests,
+    numPendingTests,
+    numTodoTests,
+    testResults,
+    testFilePath: testPath,
+  };
+};
+
+async function compileTest(entrypointFileName: string) {
+  return await runTolkCompiler({
+    entrypointFileName,
+    fsReadCallback: (path: string) => readFileContent(path, entrypointFileName),
+    withStackComments: true,
+  });
+}
+
+function readFileContent(path: string, entrypointFileName: string): string {
+  const content = fs.readFileSync(path).toString();
+  if (
+    path === entrypointFileName &&
+    !content.match(/(^|\n)\s*\/\/\s+@no-main/)
+  ) {
+    return content + '\n\n' + 'fun main() {}';
+  }
+  return content;
+}
+
+function findTestSourceCode(
+  result: TolkResultSuccess,
+  entrypointFileName: string,
+) {
+  const testSourceCode = result.sourcesSnapshot.find(
+    ({ filename }) => filename === entrypointFileName,
+  );
+  if (!testSourceCode) {
+    throw new Error(
+      `Expected behaviour: ${entrypointFileName} not found in a snapshot.`,
+    );
+  }
+  return testSourceCode;
+}
+
+function filterFixtureGetters(
+  getMethods: GetMethodDeclaration[],
+): GetMethodDeclaration[] {
+  return getMethods.filter((method) =>
+    method.methodName.startsWith('fixture_'),
+  );
+}
+
+async function setupExecutor(codeBoc64: string) {
+  const executor = await Executor.create();
+  const code = Cell.fromBase64(codeBoc64);
+  const data = beginCell().endCell();
+  return { executor, code, data };
+}
+
+async function executeTestCases(
+  testCases: GetMethodDeclaration[],
+  fixtures: Fixtures,
+  executor: Executor,
+  code: Cell,
+  data: Cell,
+  testNamePattern?: '' | RegExp,
+) {
+  let numFailingTests = 0;
+  let numPassingTests = 0;
+  let numPendingTests = 0;
+  let numTodoTests = 0;
+
+  const testResults: AssertionResult[] = [];
+
+  for (const testCase of testCases) {
+    const annotations = testCase.docBlock
+      ? extractAnnotationsFromDocBlock(testCase.docBlock)
+      : {};
+
+    const isTest = testCase.methodName.startsWith('test_') || annotations.test;
+    if (!isTest) {
+      continue;
+    }
+    const testCaseName = testCase.methodName
+      .replace(/^test_/, '')
+      .replace(/_/g, ' ');
+
+    if (
+      annotations.skip ||
+      (testNamePattern && !testNamePattern.test(testCase.methodName))
+    ) {
+      testResults.push(
+        createTestResult('pending', testCaseName, annotations, 0),
+      );
+      numPendingTests += 1;
+      continue;
+    }
+
+    if (annotations.todo) {
+      testResults.push(createTestResult('todo', testCaseName, annotations, 0));
+      numTodoTests += 1;
+      continue;
+    }
+
+    try {
+      const start = Date.now();
+      const { output } = await runSingleTestCase(
+        executor,
+        code,
+        data,
+        testCase.methodId ?? getMethodId(testCase.methodName),
+        annotations,
+        fixtures,
+        testCase.argTypes,
+      );
+      const end = Date.now();
+
+      validateTestOutput(output, annotations);
+      testResults.push(
+        createTestResult('passed', testCaseName, annotations, end - start),
+      );
+      numPassingTests += 1;
+    } catch (error) {
+      testResults.push(
+        createTestResult('failed', testCaseName, annotations, 0, error),
+      );
+      numFailingTests += 1;
+    }
+  }
+
+  return {
+    numFailingTests,
+    numPassingTests,
+    numPendingTests,
+    numTodoTests,
+    testResults,
+  };
+}
+
+async function runSingleTestCase(
+  executor: Executor,
+  code: Cell,
+  data: Cell,
+  methodId: number,
+  annotations: TestAnnotations,
+  fixtures: Fixtures,
+  argTypes?: ArgType[],
+) {
+  return annotations.fuzz
+    ? await executeFuzzTest(
+        executor,
+        code,
+        data,
+        methodId,
+        annotations,
+        fixtures,
+        argTypes ?? [],
+      )
+    : await runGetMethodWithDefaults({
+        executor,
+        code,
+        data,
+        methodId,
+        unixTime: annotations.unixTime,
+        balance: annotations.balance,
+        stack: undefined,
+        gasLimit: annotations.gasLimit,
+      });
+}
+
+function validateTestOutput(output: any, annotations: TestAnnotations) {
+  if (!output.success) {
+    throw `Execution failed: ${output.error}`;
+  }
+
+  if (annotations.exitCode) {
+    assert.equal(
+      output.vm_exit_code,
+      annotations.exitCode,
+      `Test case has thrown an error code ${output.vm_exit_code} (expected ${annotations.exitCode}).`,
+    );
+  } else if (output.vm_exit_code !== 0) {
+    const stackTrace = extractStackTrace(output.vm_log);
+    throw new Error(
+      `Test case has failed with an error code ${output.vm_exit_code}.\n\n[...]\n${stackTrace}`,
+    );
+  }
+}
 
 function extractStackTrace(vmLogs: string) {
   return vmLogs
@@ -57,210 +296,30 @@ function extractStackTrace(vmLogs: string) {
     .join('\n');
 }
 
-const runTest: RunTest = async ({
-  testPath,
-  config,
-  globalConfig,
-}): Promise<TestResult> => {
-  const entrypointFileName = testPath.replace(config.rootDir + '/', '');
-
-  const result = await runTolkCompiler({
-    entrypointFileName,
-    fsReadCallback: (path: string) => {
-      const content = fs.readFileSync(path).toString();
-
-      // NOTE: It's required to have either onInternalMessage() or main() method.
-      if (path == entrypointFileName) {
-        const disableMain = !!content.match(/(^|\n)\s*\/\/\s+@no-main/);
-        if (!disableMain) {
-          return content + '\n\n' + 'fun main() {}';
-        }
-      }
-
-      return content;
-    },
-    withStackComments: true,
-  });
-
-  if (result.status !== 'ok') {
-    throw result.message;
-  }
-
-  const testSourceCode = result.sourcesSnapshot.find(
-    ({ filename }) => filename === entrypointFileName,
-  );
-
-  if (!testSourceCode) {
-    throw new Error(
-      `Expected behaviour: ${entrypointFileName} not found in a snapshot.`,
-    );
-  }
-
-  let numFailingTests = 0;
-  let numPassingTests = 0;
-  let numPendingTests = 0;
-  let numTodoTests = 0;
-
-  const testResults: AssertionResult[] = [];
-  const testCases = await extractGetMethods(testSourceCode.contents);
-
-  // common setup
-  const executor = await Executor.create();
-  const code = Cell.fromBase64(result.codeBoc64);
-  const data = beginCell().endCell();
-
-  const DEFAULT_ADDRESS = new Address(0, randomBytes(32));
-  const DEFAULT_RANDOM_SEED = randomBytes(32);
-  const DEFAULT_BALANCE = toNano('1');
-  const DEFAULT_GAS_LIMIT = 10_000;
-  const DEFAULT_UNIX_TIME = Math.floor(Date.now() / 1000);
-
-  const testNamePattern =
-    globalConfig.testNamePattern &&
-    new RegExp(globalConfig.testNamePattern, 'i');
-
-  for (const testCase of testCases) {
-    let annotations: TestAnnotations = {};
-    let start: number = 0;
-    let end: number = 0;
-
-    const testCaseName = testCase.methodName
-      .replace(/^test_/, '')
-      .replace(/_/g, ' ');
-
-    try {
-      annotations = testCase.docBlock
-        ? extractAnnotationsFromDocBlock(testCase.docBlock)
-        : {};
-
-      const isTest =
-        testCase.methodName.startsWith('test_') || annotations.test;
-      if (!isTest) {
-        continue;
-      }
-
-      const skip =
-        annotations.skip ||
-        (testNamePattern && !testNamePattern.test(testCase.methodName));
-      if (skip) {
-        testResults.push({
-          duration: end - start,
-          failureDetails: [],
-          failureMessages: [],
-          numPassingAsserts: 0,
-          status: 'pending',
-          ancestorTitles: annotations.scope ? [annotations.scope] : [],
-          title: testCaseName,
-          fullName: testCaseName,
-        });
-
-        numPendingTests += 1;
-        continue;
-      }
-
-      if (annotations.todo) {
-        testResults.push({
-          duration: end - start,
-          failureDetails: [],
-          failureMessages: [],
-          numPassingAsserts: 0,
-          status: 'todo',
-          ancestorTitles: annotations.scope ? [annotations.scope] : [],
-          title: testCaseName,
-          fullName: testCaseName,
-        });
-
-        numTodoTests += 1;
-        continue;
-      }
-
-      start = Date.now();
-      const { output } = await executor.runGetMethod({
-        code,
-        data,
-        methodId: testCase.methodId ?? getMethodId(testCase.methodName),
-        unixTime: annotations.unixTime ?? DEFAULT_UNIX_TIME,
-        balance: annotations.balance ?? DEFAULT_BALANCE,
-        stack: [],
-        address: DEFAULT_ADDRESS,
-        randomSeed: DEFAULT_RANDOM_SEED,
-        verbosity: 'full_location_stack_verbose',
-        config: defaultConfig,
-        gasLimit: BigInt(annotations.gasLimit ?? DEFAULT_GAS_LIMIT),
-        debugEnabled: false,
-      });
-
-      end = Date.now();
-
-      if (!output.success) {
-        throw `Execution failed: ${output.error}`;
-      }
-
-      if (annotations.exitCode) {
-        assert.equal(
-          output.vm_exit_code,
-          annotations.exitCode,
-          `Test case has thrown an error code ${output.vm_exit_code} (expected ${annotations.exitCode}).`,
-        );
-      } else {
-        if (output.vm_exit_code !== 0) {
-          const stackTrace = extractStackTrace(output.vm_log);
-          throw new Error(
-            `Test case has failed with an error code ${output.vm_exit_code}.\n\n[...]\n${stackTrace}`,
-          );
-        }
-      }
-
-      testResults.push({
-        duration: end - start,
-        failureDetails: [],
-        failureMessages: [],
-        numPassingAsserts: 1,
-        status: 'passed',
-        ancestorTitles: annotations.scope ? [annotations.scope] : [],
-        title: testCaseName,
-        fullName: testCaseName,
-      });
-
-      numPassingTests += 1;
-    } catch (error: unknown) {
-      const failureMessage =
-        typeof error === 'string'
-          ? error
-          : error instanceof Error
-            ? error.message
-            : `${error}`;
-
-      testResults.push({
-        duration: end - start,
-        failureDetails: [],
-        failureMessages: [failureMessage],
-        numPassingAsserts: 0,
-        status: 'failed',
-        ancestorTitles: annotations.scope ? [annotations.scope] : [],
-        title: testCaseName,
-        fullName: testCaseName,
-      });
-
-      numFailingTests += 1;
-    }
-  }
-
+function createTestResult(
+  status: 'passed' | 'failed' | 'pending' | 'todo',
+  title: string,
+  annotations: TestAnnotations,
+  duration: number,
+  error?: unknown,
+): AssertionResult {
+  const failureMessage = error
+    ? typeof error === 'string'
+      ? error
+      : error instanceof Error
+        ? error.message
+        : `${error}`
+    : '';
   return {
-    ...createEmptyTestResult(),
-    failureMessage: formatResultsErrors(
-      testResults,
-      config,
-      globalConfig,
-      testPath,
-    ),
-    numFailingTests,
-    numPassingTests,
-    numPendingTests,
-    numTodoTests,
-    testResults,
-    testFilePath: testPath,
+    duration,
+    failureDetails: [],
+    failureMessages: failureMessage ? [failureMessage] : [],
+    numPassingAsserts: status === 'passed' ? 1 : 0,
+    status,
+    ancestorTitles: annotations.scope ? [annotations.scope] : [],
+    title,
+    fullName: title,
   };
-};
+}
 
 export = runTest;

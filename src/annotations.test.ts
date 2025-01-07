@@ -50,4 +50,23 @@ describe('extractAnnotationsFromDocBlock()', () => {
       todo: true,
     });
   });
+
+  it('extracts @runs', () => {
+    expect(extractAnnotationsFromDocBlock('// @runs 100')).toEqual({
+      runs: 100,
+    });
+  });
+
+  it('extracts @fuzz', () => {
+    expect(extractAnnotationsFromDocBlock('// @fuzz')).toEqual({
+      fuzz: true,
+    });
+  });
+
+  it('extracts @fuzz with a tlb', () => {
+    expect(extractAnnotationsFromDocBlock('// @fuzz tlb')).toEqual({
+      fuzz: true,
+      fuzzTlb: 'tlb',
+    });
+  });
 });
