@@ -60,3 +60,10 @@ get test_fuzz_sum_of_numbers_with_fixtures(x: int, y: int) {
 get test_fuzz_sum_of_numbers_with_tlb(a: int, b: int) {
     assert(calculateSum(a, b) == a + b) throw 101;
 }
+
+// @scope sum()
+// @fuzz _ a:coins b:coins = Args;
+// @runs 100
+get test_fuzz_sum_of_coins(a: int, b: int) {
+    assert(calculateSum(a, b) == a + b) throw 101;
+}

@@ -26,6 +26,11 @@ import { ast } from '@ton-community/tlb-parser';
 import { getTLBCodeByAST, TLBCode } from '@ton-community/tlb-codegen';
 import { runGetMethodWithDefaults } from './utils';
 import { generateSlice } from './slice-strategy';
+import {
+  extractIntFieldFromTLB,
+  extractSliceFieldFromTLB,
+  extractTLBCode,
+} from './tlb';
 
 const DEFAULT_RUNS = 10;
 
@@ -49,11 +54,9 @@ export async function executeFuzzTest(
     input: [],
   };
 
-  const tlbTree = annotations.fuzzTlb ? ast(annotations.fuzzTlb) : undefined;
-  const tlbCode =
-    tlbTree && annotations.fuzzTlb
-      ? getTLBCodeByAST(tlbTree, annotations.fuzzTlb)
-      : undefined;
+  const tlbCode = annotations.fuzzTlb
+    ? extractTLBCode(annotations.fuzzTlb)
+    : undefined;
 
   for (let i = 0; i < runs; i++) {
     const stack = generateFuzzedStack(argTypes, fixtures, tlbCode);
@@ -112,42 +115,4 @@ function generateFuzzedStack(
   });
 
   return builder.build();
-}
-
-function extractIntFieldFromTLB(
-  tlbCode: TLBCode,
-  fieldName: string,
-): {
-  bits: number;
-  signed: boolean;
-} {
-  const field = getFieldFromTLBCode(tlbCode, fieldName);
-
-  if (field?.fieldType?.kind !== 'TLBNumberType') {
-    throw new Error(`Field ${fieldName} is not of type TLBNumberType`);
-  }
-
-  return {
-    bits: field.fieldType.maxBits ?? 256,
-    signed: field.fieldType.signed ?? true,
-  };
-}
-
-function extractSliceFieldFromTLB(tlbCode: TLBCode, fieldName: string) {
-  const field = getFieldFromTLBCode(tlbCode, fieldName);
-
-  if (
-    field?.fieldType?.kind === 'TLBNamedType' &&
-    field?.fieldType?.name.toLowerCase() === 'address'
-  ) {
-    return 'address';
-  }
-
-  return 'slice';
-}
-
-function getFieldFromTLBCode(tlbCode: TLBCode, fieldName: string) {
-  return tlbCode?.types
-    .get('Args')
-    ?.constructors[0].fields.find((field) => field.name === fieldName);
 }

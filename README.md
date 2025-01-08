@@ -164,8 +164,9 @@ get test_fuzz_sum_of_numbers_with_fixtures(x: int, y: int) {
 Currently, the following data types are supported:
 
 - `int` - Integer fuzzing. Better use with TLB.
-- `address` - Address fuzzing.
 - `slice` - Slice fuzzing.
+- `address` - Address fuzzing.
+- `coins` - Coins fuzzing.
 
 ## License
 
