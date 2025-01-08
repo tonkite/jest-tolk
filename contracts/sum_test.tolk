@@ -50,13 +50,12 @@ get test_fuzz_sum_of_numbers(a: int, b: int) {
 
 // @scope sum()
 // @fuzz
-// @runs 100
 get test_fuzz_sum_of_numbers_with_fixtures(x: int, y: int) {
     assert(calculateSum(x, y) == x + y) throw 101;
 }
 
 // @scope sum()
-// @fuzz _ a: uint32 b: uint12 = Args;
+// @fuzz _ a:# b:uint12 = Args;
 // @runs 100
 get test_fuzz_sum_of_numbers_with_tlb(a: int, b: int) {
     assert(calculateSum(a, b) == a + b) throw 101;

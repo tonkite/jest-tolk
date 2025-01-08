@@ -64,20 +64,68 @@ const runTest: RunTest = async ({
     globalConfig.testNamePattern &&
     new RegExp(globalConfig.testNamePattern, 'i');
 
-  const {
-    numFailingTests,
-    numPassingTests,
-    numPendingTests,
-    numTodoTests,
-    testResults,
-  } = await executeTestCases(
-    testCases,
-    fixtures,
-    executor,
-    code,
-    data,
-    testNamePattern,
-  );
+  let numFailingTests = 0;
+  let numPassingTests = 0;
+  let numPendingTests = 0;
+  let numTodoTests = 0;
+
+  const testResults: AssertionResult[] = [];
+
+  for (const testCase of testCases) {
+    const annotations = testCase.docBlock
+      ? extractAnnotationsFromDocBlock(testCase.docBlock)
+      : {};
+
+    const isTest = testCase.methodName.startsWith('test_') || annotations.test;
+    if (!isTest) {
+      continue;
+    }
+    const testCaseName = testCase.methodName
+      .replace(/^test_/, '')
+      .replace(/_/g, ' ');
+
+    if (
+      annotations.skip ||
+      (testNamePattern && !testNamePattern.test(testCase.methodName))
+    ) {
+      testResults.push(
+        createTestResult('pending', testCaseName, annotations, 0),
+      );
+      numPendingTests += 1;
+      continue;
+    }
+
+    if (annotations.todo) {
+      testResults.push(createTestResult('todo', testCaseName, annotations, 0));
+      numTodoTests += 1;
+      continue;
+    }
+
+    try {
+      const start = Date.now();
+      const { output, input } = await runSingleTestCase(
+        executor,
+        code,
+        data,
+        testCase.methodId ?? getMethodId(testCase.methodName),
+        annotations,
+        fixtures,
+        testCase.argTypes,
+      );
+      const end = Date.now();
+
+      validateTestOutput(input, output, annotations);
+      testResults.push(
+        createTestResult('passed', testCaseName, annotations, end - start),
+      );
+      numPassingTests += 1;
+    } catch (error) {
+      testResults.push(
+        createTestResult('failed', testCaseName, annotations, 0, error),
+      );
+      numFailingTests += 1;
+    }
+  }
 
   return {
     ...createEmptyTestResult(),
@@ -143,86 +191,6 @@ async function setupExecutor(codeBoc64: string) {
   const code = Cell.fromBase64(codeBoc64);
   const data = beginCell().endCell();
   return { executor, code, data };
-}
-
-async function executeTestCases(
-  testCases: GetMethodDeclaration[],
-  fixtures: Fixtures,
-  executor: Executor,
-  code: Cell,
-  data: Cell,
-  testNamePattern?: '' | RegExp,
-) {
-  let numFailingTests = 0;
-  let numPassingTests = 0;
-  let numPendingTests = 0;
-  let numTodoTests = 0;
-
-  const testResults: AssertionResult[] = [];
-
-  for (const testCase of testCases) {
-    const annotations = testCase.docBlock
-      ? extractAnnotationsFromDocBlock(testCase.docBlock)
-      : {};
-
-    const isTest = testCase.methodName.startsWith('test_') || annotations.test;
-    if (!isTest) {
-      continue;
-    }
-    const testCaseName = testCase.methodName
-      .replace(/^test_/, '')
-      .replace(/_/g, ' ');
-
-    if (
-      annotations.skip ||
-      (testNamePattern && !testNamePattern.test(testCase.methodName))
-    ) {
-      testResults.push(
-        createTestResult('pending', testCaseName, annotations, 0),
-      );
-      numPendingTests += 1;
-      continue;
-    }
-
-    if (annotations.todo) {
-      testResults.push(createTestResult('todo', testCaseName, annotations, 0));
-      numTodoTests += 1;
-      continue;
-    }
-
-    try {
-      const start = Date.now();
-      const { output, input } = await runSingleTestCase(
-        executor,
-        code,
-        data,
-        testCase.methodId ?? getMethodId(testCase.methodName),
-        annotations,
-        fixtures,
-        testCase.argTypes,
-      );
-      const end = Date.now();
-
-      validateTestOutput(input, output, annotations);
-      testResults.push(
-        createTestResult('passed', testCaseName, annotations, end - start),
-      );
-      numPassingTests += 1;
-    } catch (error) {
-      testResults.push(
-        createTestResult('failed', testCaseName, annotations, 0, error),
-      );
-      numFailingTests += 1;
-    }
-  }
-
-  return {
-    numFailingTests,
-    numPassingTests,
-    numPendingTests,
-    numTodoTests,
-    testResults,
-  };
 }
 
 async function runSingleTestCase(

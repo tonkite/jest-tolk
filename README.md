@@ -106,7 +106,7 @@ get should_fail_with_exit_code_500() {
 ### Supported Annotations:
 
 | Annotation              | Example                   | Description                                                                            |
-|:------------------------|:--------------------------|:---------------------------------------------------------------------------------------|
+| :---------------------- | :------------------------ | :------------------------------------------------------------------------------------- |
 | `@exitCode [exitCode]`  | `// @exitCode 500`        | Specifies the expected exit code. Default: `0`.                                        |
 | `@scope [scope]`        | `// @scope Pool::onSwap`  | Specifies the scope of a test (useful for test grouping).                              |
 | `@skip`                 | `// @skip`                | Marks a test to be skipped.                                                            |
@@ -116,6 +116,56 @@ get should_fail_with_exit_code_500() {
 | `@gasLimit [gas limit]` | `// @gasLimit 50000`      | Sets a gas limit for a test. Default: `10000`.                                         |
 | `@unixTime [unix time]` | `// @unixTime 1735231203` | Sets a Unix time for a test. Default: current time.                                    |
 | `@no-main`              | `// @no-main`             | Disables adding an entrypoint `fun main() {}` to avoid collision with an existing one. |
+| `@fuzz [tlb]`           | `// @fuzz _ a:# = Args;`  | Marks a test as a fuzz test with optional TLB for test arguments.                      |
+| `@runs [runs]`          | `// @runs 100`            | Sets a number of runs for a fuzz test. Default: `10`.                                  |
+
+## Fuzz Testing
+
+Fuzz testing injects **random**, **edge-case**, or **fixture-based** data into tests to uncover bugs and vulnerabilities.
+
+### Fuzz Testing in Tolk
+
+Fuzz is supported through annotation `@fuzz`, optionally with a TLB schema for `Args` type.
+
+```kotlin
+// @fuzz
+// @runs 10
+get test_fuzz_sum_of_numbers(a: int, b: int) s{
+    assert(calculateSum(a, b) == a + b) throw 101;
+}
+
+// @fuzz _ a: uint8 b:# = Args;
+get test_fuzz_with_tlb(a: int, b: int) {
+    assert(calculateSum(a, b) == a + b) throw 102;
+}
+```
+
+### Fuzz Testing with Fixtures
+
+Fixtures are predefined data sets that are declared as get-methods with prefix `fixture_`. If they are defined, random values are selected from them.
+
+```kotlin
+get fixture_x() {
+    return (6, 7, 8, 9, 10);
+}
+
+get fixture_y() {
+    return (1, 2, 3, 4, 5);
+}
+
+// @fuzz
+get test_fuzz_sum_of_numbers_with_fixtures(x: int, y: int) {
+    assert(calculateSum(x, y) == x + y) throw 101;
+}
+```
+
+### Supported Data Types
+
+Currently, the following data types are supported:
+
+- `int` - Integer fuzzing. Better use with TLB.
+- `address` - Address fuzzing.
+- `slice` - Slice fuzzing.
 
 ## License
 
