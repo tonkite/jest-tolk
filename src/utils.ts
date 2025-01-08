@@ -1,8 +1,23 @@
-import { toNano } from '@ton/core';
-import { TestAnnotations } from './annotations';
-import { Cell, Address } from '@ton/core';
+/**
+ * Copyright 2024 Scaleton Labs
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { Cell, Address, TupleItem } from '@ton/core';
 import { randomBytes } from 'node:crypto';
 import { defaultConfig, Executor } from '@ton/sandbox';
+import { GetMethodResult } from '@ton/sandbox/dist/executor/Executor';
 
 interface RunGetMethodOptions {
   executor: Executor;
@@ -22,10 +37,10 @@ export async function runGetMethodWithDefaults({
   methodId,
   unixTime = Math.floor(Date.now() / 1000), // Default to current time
   balance = BigInt(1_000_000_000), // Default to 1 TON
-  stack = [],
+  stack = [] as TupleItem[],
   gasLimit = 10_000, // Default gas limit
-}: RunGetMethodOptions) {
-  return await executor.runGetMethod({
+}: RunGetMethodOptions): Promise<GetMethodResult & { input: TupleItem[] }> {
+  const result = await executor.runGetMethod({
     code,
     data,
     methodId,
@@ -39,4 +54,5 @@ export async function runGetMethodWithDefaults({
     gasLimit: BigInt(gasLimit),
     debugEnabled: false,
   });
+  return { ...result, input: stack };
 }

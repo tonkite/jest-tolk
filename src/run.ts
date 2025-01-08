@@ -23,7 +23,7 @@ import type { RunTest } from 'create-jest-runner';
 import { runTolkCompiler, TolkResultSuccess } from '@ton/tolk-js';
 import * as fs from 'node:fs';
 import { Executor } from '@ton/sandbox';
-import { beginCell, Cell, getMethodId } from '@ton/core';
+import { beginCell, Cell, getMethodId, TupleItem } from '@ton/core';
 import { formatResultsErrors } from 'jest-message-util';
 import chalk from 'chalk';
 import * as assert from 'node:assert';
@@ -35,7 +35,12 @@ import {
 } from './source-code';
 import { executeFuzzTest } from './fuzz';
 import { runGetMethodWithDefaults } from './utils';
-import { extractFixtures, Fixtures } from './fuzz/fixture';
+import { extractFixtures, Fixtures } from './fixture';
+import {
+  GetMethodResultError,
+  GetMethodResultSuccess,
+  GetMethodResult,
+} from '@ton/sandbox/dist/executor/Executor';
 
 const runTest: RunTest = async ({
   testPath,
@@ -187,7 +192,7 @@ async function executeTestCases(
 
     try {
       const start = Date.now();
-      const { output } = await runSingleTestCase(
+      const { output, input } = await runSingleTestCase(
         executor,
         code,
         data,
@@ -198,7 +203,7 @@ async function executeTestCases(
       );
       const end = Date.now();
 
-      validateTestOutput(output, annotations);
+      validateTestOutput(input, output, annotations);
       testResults.push(
         createTestResult('passed', testCaseName, annotations, end - start),
       );
@@ -228,7 +233,7 @@ async function runSingleTestCase(
   annotations: TestAnnotations,
   fixtures: Fixtures,
   argTypes?: ArgType[],
-) {
+): Promise<GetMethodResult & { input: TupleItem[] }> {
   return annotations.fuzz
     ? await executeFuzzTest(
         executor,
@@ -251,23 +256,45 @@ async function runSingleTestCase(
       });
 }
 
-function validateTestOutput(output: any, annotations: TestAnnotations) {
+function validateTestOutput(
+  input: any[],
+  output: GetMethodResultSuccess | GetMethodResultError,
+  annotations: TestAnnotations,
+) {
   if (!output.success) {
     throw `Execution failed: ${output.error}`;
   }
+
+  const inputString =
+    input && input.length ? `\n\nInput: ${convertInputToString(input)}` : '';
 
   if (annotations.exitCode) {
     assert.equal(
       output.vm_exit_code,
       annotations.exitCode,
-      `Test case has thrown an error code ${output.vm_exit_code} (expected ${annotations.exitCode}).`,
+      `Test case has thrown an error code ${output.vm_exit_code} (expected ${annotations.exitCode}).${inputString}`,
     );
   } else if (output.vm_exit_code !== 0) {
     const stackTrace = extractStackTrace(output.vm_log);
     throw new Error(
-      `Test case has failed with an error code ${output.vm_exit_code}.\n\n[...]\n${stackTrace}`,
+      `Test case has failed with an error code ${output.vm_exit_code}.\n\n[...]\n${stackTrace}${inputString}`,
     );
   }
+}
+
+function convertInputToString(input: TupleItem[]): string {
+  return input
+    .map((item) => {
+      if (item.type === 'int') {
+        return item.value.toString();
+      } else if (['slice', 'cell', 'builder'].includes(item.type)) {
+        // @ts-ignore
+        return item.cell.toString();
+      } else {
+        return '';
+      }
+    })
+    .join(', ');
 }
 
 function extractStackTrace(vmLogs: string) {
