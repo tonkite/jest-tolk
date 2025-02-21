@@ -37,7 +37,7 @@
   },
   "dependencies": {
     "@jest/test-result": "^29.7.0",
-    "@tonkite/tree-sitter-tolk": "^0.0.1",
+    "@tonkite/tree-sitter-tolk": "^0.0.2",
     "chalk": "^4.1.2",
     "create-jest-runner": "^0.12.3",
     "jest-message-util": "^29.7.0"
