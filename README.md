@@ -151,6 +151,78 @@ get test_fail_with_exit_code_500() {
 | `@runs [runs]`          | `// @runs 1000`          | Sets a number of iterations for fuzzing. Default: `100`.                               |
 | `@no-main`              | `// @no-main`            | Disables adding an entrypoint `fun main() {}` to avoid collision with an existing one. |
 
+## Test Helpers & Assertions
+
+### Test Helpers
+
+* **`test.expectExitCode(exitCode: int)`**
+  Signals that the *current test* must terminate with `exitCode`. The runner fails the test if any other exit code (or none) is produced.
+
+* **`test.assume(condition: bool)`**
+  Skips the remainder of the test when `condition` is `false`. Useful in fuzz/property tests to ignore meaningless input.
+
+* **`test.getC7(): tuple`**
+  Returns the current value of control register *C7*.
+
+* **`test.setC7(c7: tuple)`**
+  Replaces the entire *C7* register with `c7`. Use with care.
+
+* **`test.setConfigParam<T>(value: T, index: int)`**
+  Internal helper that overwrites **one slot** in `C7` (`value` is generic).
+
+* **`test.setTime(now: int)`**
+  Overrides `blockchain.now()` for deterministic testing (config-param #3).
+
+* **`test.setBlockLogicalTime(blockLT: int)`**
+  Overrides the **block** logical-time stamp (config-param #4).
+
+* **`test.setLogicalTime(lt: int)`**
+  Overrides the **transaction** logical-time stamp (config-param #5).
+
+* **`test.setOriginalBalance(balance: coins, extraCurrencies: dict? = null)`**
+  Fakes the contract’s starting balance (config-param #7).
+
+### Assertions
+
+* **`Assert.equal(actual: int, expected: int, msg: slice = "")`**
+* **`Assert.notEqual(actual: int, expected: int, msg: slice = "")`**
+* **`Assert.equalAddress(actual: address, expected: address, msg: slice = "")`**
+* **`Assert.isNull<T>(value: T, msg: slice = "")`**
+* **`Assert.notNull<T>(value: T, msg: slice = "")`**
+* **`Assert.isTrue(flag: bool, msg: slice = "")`**
+* **`Assert.isFalse(flag: bool, msg: slice = "")`**
+* **`Assert.greaterThan(a: int, b: int, msg: slice = "")`**
+* **`Assert.greaterThanOrEqual(a: int, b: int, msg: slice = "")`**
+* **`Assert.lessThan(a: int, b: int, msg: slice = "")`**
+* **`Assert.lessThanOrEqual(a: int, b: int, msg: slice = "")`**
+* **`Assert.size(t: tuple, expected: int, msg: slice = "")`**
+* **`Assert.isInternalAddress(addr: address, msg: slice = "")`**
+* **`Assert.isExternalAddress(addr: address, msg: slice = "")`**
+* **`Assert.isNoneAddress(addr: address, msg: slice = "")`**
+* **`Assert.consumesLessThan(fn: () -> void, gasLimit: int, msg: slice = "")`**
+* **`Assert.fail(message: slice, code: slice = "")`**
+
+### Example Usage
+
+```func
+get sample_test() {
+    ;; Freeze time and set deterministic logical-times
+    test.setTime(1_726_689_600);          ;; 2025-06-23 UTC
+    test.setBlockLogicalTime(1_234_567);
+    test.setLogicalTime(1_234_568);
+
+    ;; Basic assertions
+    Assert.isTrue(2 + 2 == 4);
+    Assert.equal(0xdead, 0xdead);
+
+    ;; Expect exit-code 13 from the next call
+    test.expectExitCode(13);
+    myContract.someDangerousCall();
+}
+```
+
+Happy testing 🚀
+
 ## License
 
 <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-green.svg" alt="License"></a>
