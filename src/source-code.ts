@@ -21,6 +21,7 @@ export interface GetMethodDeclaration {
   docBlock?: string;
   methodId?: number;
   methodName: string;
+  parameters: { name: string; type: string }[];
 }
 
 export function extractDocBlock(node: Parser.SyntaxNode): string | null {
@@ -69,6 +70,14 @@ export async function extractGetMethods(
       ?.child(3)?.text;
     const methodName = node.childForFieldName('name')?.text;
 
+    const parameters = node.children
+      .find(c => c.type === 'parameter_list')!
+      .children.filter(c => c.type === 'parameter_declaration')
+      .map(parameter => ({
+        name: parameter.childForFieldName('name')!.text,
+        type: parameter.childForFieldName('type')!.text,
+      }));
+
     const docBlock = node.previousSibling
       ? extractDocBlock(node.previousSibling)?.replace(/(^|\n)(\/\/\s*)/g, '$1')
       : null;
@@ -82,6 +91,7 @@ export async function extractGetMethods(
         : undefined,
       methodName: methodName!,
       docBlock: docBlock ?? undefined,
+      parameters,
     });
   }
 

@@ -31,6 +31,7 @@ fun calculateSum(a: int, b: int) {
 You can write unit tests for this function using Tolk:
 
 ```kotlin
+import "../node_modules/@tonkite/jest-tolk/testing.tolk"
 import "sum.tolk"
 
 // @scope sum()
@@ -41,10 +42,13 @@ get test_returns_sum_of_numbers() {
     assert(calculateSum(a, b) == a + b) throw 100;
 }
 
+fun cast<T, X>(value: X): T asm "NOP";
+
 // @scope sum()
-// @exitCode 7 (type check error)
 get test_fails_if_value_is_not_int() {
-    val a: int = null;
+    test.expectExitCode(7); // type check error
+
+    val a: int = cast<int>(null);
     val b: int = 7;
 
     calculateSum(a, b);
@@ -86,6 +90,40 @@ Test result:
    export default config;
    ```
 
+## Fuzzing
+
+The Runner comes with native fuzz-testing support. For every fuzz test (starting from `testFuzz_`) it:
+
+1. Generates random values for each argument.
+
+2. Executes the test repeatedly (default 100 runs).
+
+3. Stops on the first failure and prints the failing inputs.
+
+Adjust the iteration count with the `@runs` annotation.
+
+### Fuzz-able types
+
+- Signed and unsigned integers of any width — `int`, `int8`, `uint231`, etc.
+(`bool` is treated as a one-bit unsigned int).
+- `address` (including `addr_std`, `addr_extern` and `addr_none`)
+
+### Example:
+
+```kotlin
+fun div(x: int, y: int): int
+    asm "DIV";
+
+/** @runs 1000 */
+get testFuzz_div(x: int8, y: uint16) {
+    if (y == 0) {
+        test.expectExitCode(4); // division by zero
+    }
+
+    Assert.equal(x / y, div(x, y));
+}
+```
+
 ## Annotations
 
 The runner allows you to configure the behavior of tests using special annotations in comments.
@@ -94,28 +132,24 @@ The runner allows you to configure the behavior of tests using special annotatio
 
 ```kotlin
 /**
- * @test
  * @scope examples
- * @exitCode 500
  */
-get should_fail_with_exit_code_500() {
+get test_fail_with_exit_code_500() {
+    test.expectExitCode(500);
     throw 500;
 }
 ```
 
 ### Supported Annotations:
 
-| Annotation              | Example                   | Description                                                                            |
-|:------------------------|:--------------------------|:---------------------------------------------------------------------------------------|
-| `@exitCode [exitCode]`  | `// @exitCode 500`        | Specifies the expected exit code. Default: `0`.                                        |
-| `@scope [scope]`        | `// @scope Pool::onSwap`  | Specifies the scope of a test (useful for test grouping).                              |
-| `@skip`                 | `// @skip`                | Marks a test to be skipped.                                                            |
-| `@todo`                 | `// @todo`                | Marks a test to be done later.                                                         |
-| `@test`                 | `// @test`                | Marks a get-method (which isn't prefixed by `test_`) as a test.                        |
-| `@balance [balance]`    | `// @balance 1000000000`  | Sets a balance for a test. Default: `1000000000` (1 TON).                              |
-| `@gasLimit [gas limit]` | `// @gasLimit 50000`      | Sets a gas limit for a test. Default: `10000`.                                         |
-| `@unixTime [unix time]` | `// @unixTime 1735231203` | Sets a Unix time for a test. Default: current time.                                    |
-| `@no-main`              | `// @no-main`             | Disables adding an entrypoint `fun main() {}` to avoid collision with an existing one. |
+| Annotation              | Example                  | Description                                                                            |
+|:------------------------|:-------------------------|:---------------------------------------------------------------------------------------|
+| `@scope [scope]`        | `// @scope Pool::onSwap` | Specifies the scope of a test (useful for test grouping).                              |
+| `@skip`                 | `// @skip`               | Marks a test to be skipped.                                                            |
+| `@todo`                 | `// @todo`               | Marks a test to be done later.                                                         |
+| `@gasLimit [gas limit]` | `// @gasLimit 50000`     | Sets a gas limit for a test. Default: `10000`.                                         |
+| `@runs [runs]`          | `// @runs 1000`          | Sets a number of iterations for fuzzing. Default: `100`.                               |
+| `@no-main`              | `// @no-main`            | Disables adding an entrypoint `fun main() {}` to avoid collision with an existing one. |
 
 ## License
 

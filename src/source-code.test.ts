@@ -9,6 +9,7 @@ describe('extractGetMethods', () => {
     ).resolves.toEqual([
       {
         methodName: 'test_case_1',
+        parameters: [],
       },
     ]);
   });
@@ -23,6 +24,7 @@ describe('extractGetMethods', () => {
       {
         methodName: 'test_case_1',
         methodId: 5858,
+        parameters: [],
       },
     ]);
   });
@@ -38,6 +40,24 @@ describe('extractGetMethods', () => {
       {
         methodName: 'test_case_1',
         docBlock: '@exitCode 50\n@gasLimit',
+        parameters: [],
+      },
+    ]);
+  });
+
+  it('extracts get-methods arguments', () => {
+    expect(
+      extractGetMethods(`
+      get test_case_1(a: uint3, b: bool, c: address) {}
+    `),
+    ).resolves.toEqual([
+      {
+        methodName: 'test_case_1',
+        parameters: [
+          { name: 'a', type: 'uint3' },
+          { name: 'b', type: 'bool' },
+          { name: 'c', type: 'address' }
+        ],
       },
     ]);
   });

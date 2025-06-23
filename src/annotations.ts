@@ -15,12 +15,9 @@
  */
 
 export interface TestAnnotations {
-  exitCode?: number;
+  runs?: number;
   scope?: string;
-  balance?: bigint;
   gasLimit?: number;
-  unixTime?: number;
-  test?: boolean;
   skip?: boolean;
   todo?: boolean;
 }
@@ -34,32 +31,20 @@ export function extractAnnotationsFromDocBlock(
   for (const line of lines) {
     let matches;
 
-    if ((matches = line.match(/@exitCode\s+(-?\d+)/))) {
-      annotations.exitCode = parseInt(matches[1]);
+    if ((matches = line.match(/@runs\s+(-?\d+)/))) {
+      annotations.runs = parseInt(matches[1]);
     }
 
     if ((matches = line.match(/@scope\s+(.+)/))) {
       annotations.scope = matches[1];
     }
 
-    if ((matches = line.match(/@balance\s+(\d+)/))) {
-      annotations.balance = BigInt(matches[1]);
-    }
-
     if ((matches = line.match(/@gasLimit\s+(\d+)/))) {
       annotations.gasLimit = parseInt(matches[1]);
     }
 
-    if ((matches = line.match(/@unixTime\s+(\d+)/))) {
-      annotations.unixTime = parseInt(matches[1]);
-    }
-
     if ((matches = line.match(/@skip/))) {
       annotations.skip = true;
-    }
-
-    if ((matches = line.match(/@test/))) {
-      annotations.test = true;
     }
 
     if ((matches = line.match(/@todo/))) {
