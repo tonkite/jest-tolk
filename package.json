@@ -1,6 +1,6 @@
 {
   "name": "@tonkite/jest-tolk",
-  "version": "0.0.9",
+  "version": "1.0.0",
   "main": "dist/index.js",
   "types": "dist/index.js",
   "license": "Apache-2.0",
