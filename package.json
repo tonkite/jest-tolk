@@ -5,7 +5,8 @@
   "types": "dist/index.js",
   "license": "Apache-2.0",
   "files": [
-    "dist"
+    "dist",
+    "testing.tolk"
   ],
   "repository": {
     "type": "git",
