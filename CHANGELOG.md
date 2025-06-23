@@ -1,5 +1,7 @@
 # Changelog
 
+## [1.0.2](https://github.com/tonkite/jest-tolk/compare/1.0.1...1.0.2) (2025-06-23)
+
 ## [1.0.1](https://github.com/tonkite/jest-tolk/compare/1.0.0...1.0.1) (2025-06-23)
 
 ## 1.0.0 (2025-06-23)
